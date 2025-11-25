@@ -50,7 +50,9 @@ export async function testTelegramConfig(token, chatId) {
   }
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// Используем относительные пути для работы через nginx proxy
+// В dev режиме можно установить VITE_API_URL=http://localhost:3001
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 /**
  * Отправляет сообщение в Telegram бота через backend API

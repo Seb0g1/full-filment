@@ -1,6 +1,8 @@
 // Сервис для работы с чатом и Telegram
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// Используем относительные пути для работы через nginx proxy
+// В dev режиме можно установить VITE_API_URL=http://localhost:3001
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 let userId = null
 let pollingStarted = false

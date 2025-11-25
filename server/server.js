@@ -2,8 +2,14 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import TelegramBot from 'node-telegram-bot-api'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Загружаем .env файл из папки server
+dotenv.config({ path: join(__dirname, '.env') })
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -33,10 +39,23 @@ if (!BOT_TOKEN || !GROUP_CHAT_ID) {
 
 let bot = null
 if (BOT_TOKEN) {
-  bot = new TelegramBot(BOT_TOKEN, { polling: true })
+  try {
+    bot = new TelegramBot(BOT_TOKEN, { polling: true })
 
-  // Обработка ответов из Telegram группы
-  bot.on('message', async (msg) => {
+    // Обработка ошибок бота
+    bot.on('error', (error) => {
+      console.error('❌ Telegram bot error:', error.message)
+    })
+
+    bot.on('polling_error', (error) => {
+      console.error('❌ Telegram polling error:', error.message)
+      if (error.code === 'ETELEGRAM' && error.response?.body?.error_code === 401) {
+        console.error('⚠️  Invalid bot token! Please check TELEGRAM_BOT_TOKEN in .env file')
+      }
+    })
+
+    // Обработка ответов из Telegram группы
+    bot.on('message', async (msg) => {
     // Игнорируем сообщения от бота
     if (msg.from.is_bot) return
 
@@ -85,11 +104,17 @@ if (BOT_TOKEN) {
         }
       }
     }
-  })
+    })
 
-  console.log('✅ Telegram bot initialized')
+    console.log('✅ Telegram bot initialized')
+  } catch (error) {
+    console.error('❌ Failed to initialize Telegram bot:', error.message)
+    console.error('   Please check your TELEGRAM_BOT_TOKEN in .env file')
+    bot = null
+  }
 } else {
   console.warn('⚠️  Telegram bot not initialized - no token provided')
+  console.warn('   Create .env file in server/ folder with TELEGRAM_BOT_TOKEN and TELEGRAM_GROUP_CHAT_ID')
 }
 
 // Форматирование сообщения для Telegram
@@ -206,7 +231,14 @@ app.post('/api/chat/send', async (req, res) => {
 
         console.log(`📤 Сообщение отправлено в Telegram для пользователя ${userId}`)
       } catch (error) {
-        console.error('Error sending to Telegram:', error.message)
+        console.error('❌ Error sending to Telegram:', error.message)
+        if (error.response?.body?.error_code === 400) {
+          console.error('   Возможно, бот не добавлен в группу или неправильный GROUP_CHAT_ID')
+        } else if (error.response?.body?.error_code === 401) {
+          console.error('   Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN')
+        } else if (error.response?.body?.error_code === 403) {
+          console.error('   Бот заблокирован или не имеет доступа к группе')
+        }
         // Продолжаем работу даже если Telegram недоступен
       }
     }
@@ -256,8 +288,17 @@ app.post('/api/telegram/calculator', async (req, res) => {
         )
         console.log('📊 Заявка с калькулятора отправлена в Telegram')
       } catch (error) {
-        console.error('Error sending calculator message:', error.message)
-        return res.status(500).json({ success: false, error: 'Failed to send to Telegram' })
+        console.error('❌ Error sending calculator message:', error.message)
+        if (error.response?.body?.error_code === 400) {
+          console.error('   Возможно, бот не добавлен в группу или неправильный GROUP_CHAT_ID')
+        } else if (error.response?.body?.error_code === 401) {
+          console.error('   Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN')
+        }
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to send to Telegram',
+          details: error.message 
+        })
       }
     }
 
@@ -289,8 +330,17 @@ app.post('/api/telegram/contact', async (req, res) => {
         )
         console.log('📝 Заявка с контактной формы отправлена в Telegram')
       } catch (error) {
-        console.error('Error sending contact message:', error.message)
-        return res.status(500).json({ success: false, error: 'Failed to send to Telegram' })
+        console.error('❌ Error sending contact message:', error.message)
+        if (error.response?.body?.error_code === 400) {
+          console.error('   Возможно, бот не добавлен в группу или неправильный GROUP_CHAT_ID')
+        } else if (error.response?.body?.error_code === 401) {
+          console.error('   Неверный токен бота! Проверьте TELEGRAM_BOT_TOKEN')
+        }
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to send to Telegram',
+          details: error.message 
+        })
       }
     }
 
@@ -307,12 +357,27 @@ app.get('/health', (req, res) => {
 })
 
 app.listen(PORT, () => {
+  console.log('\n' + '='.repeat(50))
   console.log(`🚀 Chat server running on http://localhost:${PORT}`)
+  console.log('='.repeat(50))
   console.log(`📱 Telegram bot: ${BOT_TOKEN ? '✅ Configured' : '❌ Not configured'}`)
-  console.log(`👥 Group chat ID: ${GROUP_CHAT_ID || 'Not set'}`)
+  if (!BOT_TOKEN) {
+    console.log('   ⚠️  Create .env file in server/ folder with TELEGRAM_BOT_TOKEN')
+  }
+  console.log(`👥 Group chat ID: ${GROUP_CHAT_ID || '❌ Not set'}`)
+  if (!GROUP_CHAT_ID) {
+    console.log('   ⚠️  Set TELEGRAM_GROUP_CHAT_ID in .env file')
+  }
   console.log(`📌 Topics configured:`)
-  console.log(`   - Чат с клиентом: ${TOPIC_CHAT_CLIENT || 'Not set'}`)
-  console.log(`   - Калькулятор заявки: ${TOPIC_CALCULATOR || 'Not set'}`)
-  console.log(`   - Оставить заявку: ${TOPIC_CONTACT_FORM || 'Not set'}`)
+  console.log(`   - Чат с клиентом: ${TOPIC_CHAT_CLIENT || 'Not set (using 0)'}`)
+  console.log(`   - Калькулятор заявки: ${TOPIC_CALCULATOR || 'Not set (using 0)'}`)
+  console.log(`   - Оставить заявку: ${TOPIC_CONTACT_FORM || 'Not set (using 0)'}`)
+  if (BOT_TOKEN && GROUP_CHAT_ID) {
+    console.log('\n✅ Telegram bot is ready to receive messages!')
+  } else {
+    console.log('\n⚠️  Telegram bot is NOT configured. Messages will not be sent to Telegram.')
+    console.log('   See CHAT_SETUP.md or server/README.md for setup instructions')
+  }
+  console.log('='.repeat(50) + '\n')
 })
 
