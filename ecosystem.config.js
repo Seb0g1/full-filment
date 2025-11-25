@@ -1,4 +1,5 @@
 // PM2 конфигурация для автозапуска backend сервера
+// Примечание: Переменные из server/.env загружаются автоматически через dotenv в server.js
 module.exports = {
   apps: [{
     name: 'fulfillment-bot',
@@ -11,6 +12,8 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       PORT: 3001
+      // TELEGRAM_BOT_TOKEN и TELEGRAM_GROUP_CHAT_ID загружаются из server/.env
+      // Не добавляйте их сюда, чтобы не переопределять значения из .env
     },
     error_file: './logs/pm2-error.log',
     out_file: './logs/pm2-out.log',

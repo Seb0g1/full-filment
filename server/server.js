@@ -9,7 +9,16 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 // Загружаем .env файл из папки server
-dotenv.config({ path: join(__dirname, '.env') })
+const envPath = join(__dirname, '.env')
+const envResult = dotenv.config({ path: envPath })
+
+// Отладочная информация о загрузке .env
+if (envResult.error) {
+  console.warn(`⚠️  Не удалось загрузить .env файл: ${envPath}`)
+  console.warn(`   Ошибка: ${envResult.error.message}`)
+} else {
+  console.log(`✅ .env файл загружен из: ${envPath}`)
+}
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -24,8 +33,13 @@ const userTelegramMap = new Map() // userId -> { messageId, threadId, lastBotMes
 const userInfo = new Map() // userId -> { name, phone }
 
 // Настройка Telegram бота
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ''
-const GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID || ''
+const BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || '').trim()
+const GROUP_CHAT_ID = (process.env.TELEGRAM_GROUP_CHAT_ID || '').trim()
+
+// Отладочная информация о переменных окружения
+console.log(`🔍 Отладка переменных окружения:`)
+console.log(`   TELEGRAM_BOT_TOKEN: ${BOT_TOKEN ? '✅ Установлен (' + BOT_TOKEN.substring(0, 10) + '...)' : '❌ Не установлен'}`)
+console.log(`   TELEGRAM_GROUP_CHAT_ID: ${GROUP_CHAT_ID ? '✅ Установлен (' + GROUP_CHAT_ID + ')' : '❌ Не установлен'}`)
 
 // ID топиков в группе
 const TOPIC_CHAT_CLIENT = parseInt(process.env.TELEGRAM_TOPIC_CHAT_CLIENT || '0')
